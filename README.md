@@ -1,5 +1,7 @@
 # OperationHoldElephant
 
+[![CI/CD pipeline](https://github.com/gevorg-martir/operation-hold-elephant/actions/workflows/cicd.yml/badge.svg)](https://github.com/gevorg-martir/operation-hold-elephant/actions/workflows/cicd.yml)
+
 This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 11.2.6.
 
 ## Development server
