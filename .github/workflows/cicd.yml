@@ -1,0 +1,67 @@
+name: CI/CD pipeline
+env:
+  DOCKER_PROJECT_NAME: gevorg-martir
+  DOCKER_REPO_NAME: operation-hold-elephant
+  DOCKER_REGISTRY_NAME: docker.pkg.github.com
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      - name: Cache node-modules
+        uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
+      - name: Setup node:12
+        uses: actions/setup-node@v1
+        with:
+          node-version: '12.x'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Build image
+        if: github.event_name == 'push'
+        run: docker build -t $DOCKER_REGISTRY_NAME/$DOCKER_PROJECT_NAME/$DOCKER_REPO_NAME/$DOCKER_REPO_NAME .
+
+      - name: Login registry
+        if: github.event_name == 'push'
+        run:
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login $DOCKER_REGISTRY_NAME -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      - name: Create a release
+        if: github.event_name == 'push'
+        id: release
+        uses: gevorg-martir/version-me@v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish image
+        if: github.event_name == 'push' && steps.release.outputs.version-changed == 'true'
+        env:
+          releaseVersion: ${{ steps.release.outputs.new-version }}
+        run: |
+          docker tag $DOCKER_REGISTRY_NAME/$DOCKER_PROJECT_NAME/$DOCKER_REPO_NAME/$DOCKER_REPO_NAME $DOCKER_REGISTRY_NAME/$DOCKER_PROJECT_NAME/$DOCKER_REPO_NAME/$DOCKER_REPO_NAME:$releaseVersion
+          docker push $DOCKER_REGISTRY_NAME/$DOCKER_PROJECT_NAME/$DOCKER_REPO_NAME/$DOCKER_REPO_NAME:$releaseVersion
+          docker push $DOCKER_REGISTRY_NAME/$DOCKER_PROJECT_NAME/$DOCKER_REPO_NAME/$DOCKER_REPO_NAME:latest
